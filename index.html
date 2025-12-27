@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>For You ❤️</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(circle at top, #ffffff, #f2f2f2);
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* Falling petals */
+.petal {
+  position: fixed;
+  top: -10%;
+  width: 14px;
+  height: 22px;
+  border-radius: 60%;
+  opacity: 0.85;
+  animation: fall linear infinite;
+  pointer-events: none;
+}
+
+.white { background: rgba(255,255,255,0.9); }
+.red { background: rgba(180,0,20,0.85); }
+
+@keyframes fall {
+  from { transform: translateY(-10vh) rotate(0deg); }
+  to { transform: translateY(120vh) rotate(360deg); }
+}
+
+/* Fullscreen container */
+#card {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Fullscreen photo */
+#photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Gentle heartbeat glow */
+@keyframes pulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.08); }
+}
+
+.revealed {
+  animation: pulse 4s ease-in-out infinite;
+}
+
+/* Scratch layer */
+canvas {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+/* Bottom vignette */
+#vignette {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 35%;
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.45),
+    rgba(0,0,0,0)
+  );
+  pointer-events: none;
+}
+
+/* Sparkle animation */
+@keyframes sparkle {
+  0% { text-shadow: 0 0 6px rgba(255,255,255,0.35); }
+  50% { text-shadow: 0 0 18px rgba(255,255,255,0.85); }
+  100% { text-shadow: 0 0 6px rgba(255,255,255,0.35); }
+}
+
+/* Ending message */
+#endingMessage {
+  position: absolute;
+  bottom: 42px;
+  left: 50%;
+  transform: translate(-50%, 12px);
+  padding: 14px 28px;
+  border-radius: 18px;
+  font-size: 32px;
+  font-weight: 500;
+  color: white;
+  opacity: 0;
+  animation: sparkle 4.5s ease-in-out infinite;
+  transition: opacity 2.5s ease, transform 2.5s ease;
+  pointer-events: none;
+
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Final resting position */
+#endingMessage.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+</style>
+</head>
+
+<body>
+
+<audio id="music" loop>
+  <source src="song.mp3" type="audio/mpeg">
+</audio>
+
+<div id="card">
+  <img id="photo" src="photo.jpg">
+  <canvas id="scratch"></canvas>
+
+  <div id="vignette"></div>
+  <div id="endingMessage">You are my 11:11</div>
+</div>
+
+<script>
+const music = document.getElementById("music");
+const canvas = document.getElementById("scratch");
+const ctx = canvas.getContext("2d");
+const photo = document.getElementById("photo");
+const endingMessage = document.getElementById("endingMessage");
+
+let isScratching = false;
+let revealTriggered = false;
+
+/* Resize canvas */
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = "#e6e6e6";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.font = "26px Segoe UI";
+  ctx.fillStyle = "#777";
+  ctx.textAlign = "center";
+  ctx.fillText("Scratch gently ❤️", canvas.width / 2, canvas.height / 2);
+}
+
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+}
+
+/* Music fade-in only */
+function startScratch() {
+  isScratching = true;
+
+  if (music.paused) {
+    music.volume = 0;
+    music.play().catch(() => {});
+    let v = 0;
+    const fade = setInterval(() => {
+      v += 0.05;
+      music.volume = Math.min(v, 1);
+      if (v >= 1) clearInterval(fade);
+    }, 120);
+  }
+}
+
+function endScratch() {
+  isScratching = false;
+}
+
+/* Scratch & reveal */
+function scratch(e) {
+  if (!isScratching || revealTriggered) return;
+  e.preventDefault();
+
+  const pos = getPos(e);
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, 30, 0, Math.PI * 2);
+  ctx.fill();
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  let cleared = 0;
+
+  for (let i = 3; i < imageData.length; i += 4) {
+    if (imageData[i] === 0) cleared++;
+  }
+
+  if (cleared / (canvas.width * canvas.height) > 0.45) {
+    revealTriggered = true;
+
+    canvas.style.transition = "opacity 2s ease";
+    canvas.style.opacity = 0;
+
+    photo.classList.add("revealed");
+
+    setTimeout(() => {
+      endingMessage.classList.add("show");
+    }, 2000);
+  }
+}
+
+/* Events */
+canvas.addEventListener("mousedown", startScratch);
+canvas.addEventListener("mousemove", scratch);
+canvas.addEventListener("mouseup", endScratch);
+canvas.addEventListener("touchstart", startScratch, { passive: false });
+canvas.addEventListener("touchmove", scratch, { passive: false });
+canvas.addEventListener("touchend", endScratch);
+
+/* Petals */
+setInterval(() => {
+  const petal = document.createElement("div");
+  petal.className = "petal " + (Math.random() > 0.5 ? "white" : "red");
+  petal.style.left = Math.random() * 100 + "vw";
+  petal.style.animationDuration = 12 + Math.random() * 8 + "s";
+  petal.style.opacity = 0.5 + Math.random() * 0.4;
+  document.body.appendChild(petal);
+
+  setTimeout(() => petal.remove(), 20000);
+}, 450);
+</script>
+
+</body>
+</html>
